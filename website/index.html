@@ -1,0 +1,896 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Architecture and code walkthrough of the Who Authorized That? Backstage MCP identity demo.">
+<title>Who Authorized That? Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; }
+img { max-width: 100%; }
+/* Layout: one wide system diagram as the hero, then the request path, identities and what is standard vs custom. */
+:root {
+  --bg: #f5f7f8;
+  --surface: #ffffff;
+  --zone: #e9eef1;
+  --fg: #16232b;
+  --muted: #5a6b75;
+  --line: #8396a1;
+  --border: #c8d3d9;
+  --accent: #0d7c86;
+  --accent-soft: #d6eef0;
+  --danger: #b4372f;
+  --danger-soft: #f8e1df;
+  --ok: #2f7d3b;
+  --ok-soft: #e0f1e2;
+  --grant: #9a6408;
+  --grant-soft: #f6ead2;
+  --code-bg: #f0f4f6;
+  --code-fg: #1b2a33;
+  --code-comment: #6b7d87;
+  --code-str: #0b6a52;
+  --hl: #fbe7a6;
+  --display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f171c; --surface: #172229; --zone: #13202a; --fg: #e3ebef; --muted: #93a6b1;
+    --line: #6d8390; --border: #2c3d47; --accent: #4cc1c9; --accent-soft: #123a3e;
+    --danger: #f08a80; --danger-soft: #3d1d1b; --ok: #79c886; --ok-soft: #173321;
+    --grant: #e2b45c; --grant-soft: #3a2c12; color-scheme: dark;
+    --code-bg: #0b1317; --code-fg: #dbe5ea; --code-comment: #7d919c; --code-str: #7fd3b4; --hl: #4a3f12;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f171c; --surface: #172229; --zone: #13202a; --fg: #e3ebef; --muted: #93a6b1;
+  --line: #6d8390; --border: #2c3d47; --accent: #4cc1c9; --accent-soft: #123a3e;
+  --danger: #f08a80; --danger-soft: #3d1d1b; --ok: #79c886; --ok-soft: #173321;
+  --grant: #e2b45c; --grant-soft: #3a2c12; color-scheme: dark;
+  --code-bg: #0b1317; --code-fg: #dbe5ea; --code-comment: #7d919c; --code-str: #7fd3b4; --hl: #4a3f12;
+}
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 64px;
+}
+.wrap { max-width: 1140px; margin: 0 auto; display: grid; gap: 40px; }
+header { display: grid; gap: 8px; max-width: 760px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--display); font-weight: 600; font-size: clamp(30px, 5vw, 44px); line-height: 1.05; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 600; font-size: 24px; margin: 0 0 14px; text-wrap: balance; }
+.lede { color: var(--muted); margin: 0; font-size: 16px; }
+code, .mono { font-family: var(--mono); font-size: .88em; }
+
+.diagram { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px; overflow-x: auto; }
+.diagram svg { display: block; width: 100%; min-width: 980px; height: auto; }
+svg text { font-family: var(--body); fill: var(--fg); }
+svg .t { font-size: 13.5px; font-weight: 600; }
+svg .s { font-size: 11.5px; fill: var(--muted); }
+svg .m { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+svg .zl { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; fill: var(--muted); }
+svg .zone { fill: var(--zone); stroke: var(--border); stroke-dasharray: 5 4; }
+svg .bk { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+svg .box { fill: var(--surface); stroke: var(--border); stroke-width: 1.2; }
+svg .key { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+svg .ext { fill: var(--surface); stroke: var(--line); stroke-dasharray: 3 3; }
+svg .c1 { fill: var(--danger-soft); stroke: var(--danger); }
+svg .c2 { fill: var(--ok-soft); stroke: var(--ok); }
+svg .c3 { fill: var(--grant-soft); stroke: var(--grant); }
+svg .c1t { fill: var(--danger); font-size: 11.5px; font-weight: 600; }
+svg .c2t { fill: var(--ok); font-size: 11.5px; font-weight: 600; }
+svg .c3t { fill: var(--grant); font-size: 11.5px; font-weight: 600; }
+svg .ar { fill: none; stroke: var(--line); stroke-width: 1.6; }
+svg .ar.data { stroke-dasharray: 4 4; }
+svg .ar.hot { stroke: var(--accent); stroke-width: 2; }
+svg .head { fill: var(--line); }
+svg .head.hot { fill: var(--accent); }
+svg .al { font-size: 11px; fill: var(--muted); }
+svg .al.hot { fill: var(--accent); font-weight: 600; }
+svg .badge { fill: var(--accent); }
+svg .badget { fill: var(--surface); font-family: var(--mono); font-size: 11px; font-weight: 600; }
+
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 32px; }
+ol.steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; counter-reset: s; }
+ol.steps li { display: grid; grid-template-columns: 28px 1fr; gap: 12px; align-items: start; min-width: 0; }
+ol.steps li::before { counter-increment: s; content: counter(s); font-family: var(--mono); font-size: 12px; font-weight: 600; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: var(--surface); display: grid; place-items: center; margin-top: 1px; }
+ol.steps b { font-weight: 600; }
+
+.chapters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; }
+.ch { border: 1px solid var(--border); border-top: 3px solid var(--c); background: var(--surface); border-radius: 8px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.ch .n { font-family: var(--mono); font-size: 12px; color: var(--c); font-weight: 600; letter-spacing: .04em; }
+.ch h3 { margin: 0; font-family: var(--display); font-size: 18px; font-weight: 600; }
+.ch p { margin: 0; color: var(--muted); font-size: 14px; }
+.ch .res { font-family: var(--mono); font-size: 12.5px; color: var(--fg); }
+
+.tbl { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font-family: var(--mono); font-size: 11.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+td:first-child { font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+
+.split { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; }
+.split > div { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; min-width: 0; }
+.split h3 { margin: 0 0 8px; font-family: var(--display); font-size: 17px; font-weight: 600; }
+.split ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.tag { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius: 4px; }
+.tag.std { background: var(--accent-soft); color: var(--accent); }
+.tag.cus { background: var(--grant-soft); color: var(--grant); }
+footer { color: var(--muted); font-size: 13px; }
+
+/* Code walkthrough */
+.code-intro { color: var(--muted); margin: 0 0 16px; max-width: 760px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; align-items: center; }
+.tab { font: 500 14px/1 var(--body); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--fg); cursor: pointer; }
+.tab:hover { border-color: var(--line); }
+.tab:focus-visible, .fs:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tab[aria-selected="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.tab .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--accent)); margin-right: 8px; vertical-align: 1px; }
+.fs { margin-left: auto; font: 500 13px/1 var(--body); padding: 9px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; }
+#walk:fullscreen { background: var(--bg); padding: 28px 40px; overflow: auto; }
+#walk:fullscreen pre { font-size: 17px; }
+.panel { display: grid; gap: 20px; }
+.why { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 10px; }
+.gate { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; display: grid; gap: 2px; min-width: 0; }
+.gate .k { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.gate .v { font-weight: 600; }
+.gate.pass .v { color: var(--ok); }
+.gate.fail .v { color: var(--danger); }
+.gate.skip .v { color: var(--danger); }
+.snip { display: grid; gap: 0; min-width: 0; }
+.snip .cap { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; justify-content: space-between; background: var(--zone); border: 1px solid var(--border); border-bottom: 0; border-radius: 8px 8px 0 0; padding: 8px 14px; }
+.snip .cap b { font-weight: 600; font-size: 14px; }
+.snip .cap span { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+pre { margin: 0; background: var(--code-bg); color: var(--code-fg); border: 1px solid var(--border); border-radius: 0 0 8px 8px; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 14px; line-height: 1.6; tab-size: 2; }
+pre .c { color: var(--code-comment); font-style: italic; }
+pre .hl { background: var(--hl); border-radius: 3px; padding: 1px 2px; }
+pre .s { color: var(--code-str); }
+.note { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+.lesson { border-left: 3px solid var(--c); padding: 6px 0 6px 14px; font-size: 16px; font-weight: 500; max-width: 820px; }
+.eval td, .eval th { text-align: center; }
+.eval td:first-child, .eval th:first-child { text-align: left; }
+.y { color: var(--ok); font-weight: 600; }
+.n { color: var(--danger); font-weight: 600; }
+.cols2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 16px; align-items: start; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">BackstageCon · Your Agent Shouldn't Log in as You</div>
+    <h1>Who Authorized That? Architecture</h1>
+    <p class="lede">A real Backstage 1.56 app with its MCP server, OAuth sign-in and permission framework.
+      An AI agent works ticket MIG-42 for Alice. One checkpoint inside Backstage decides what the agent may actually unregister.</p>
+  </header>
+
+  <section class="diagram" aria-label="System architecture diagram">
+    <svg viewBox="0 0 1100 650" role="img" aria-labelledby="dt">
+      <title id="dt">Presenter laptop tunnels into a VM running Backstage. A spawned AI agent calls the MCP server; the retire-service checkpoint asks the permission framework or checks a task grant before a restricted executor unregisters catalog entries.</title>
+      <defs>
+        <marker id="h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="hh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head hot" d="M0,0 L10,5 L0,10 z"/></marker>
+      </defs>
+
+      <!-- Laptop zone -->
+      <rect class="zone" x="16" y="90" width="196" height="240" rx="10"/>
+      <text class="zl" x="30" y="112">PRESENTER LAPTOP</text>
+      <rect class="box" x="32" y="128" width="164" height="64" rx="7"/>
+      <text class="t" x="44" y="152">Browser</text>
+      <text class="m" x="44" y="172">/identity-boundary-demo</text>
+      <rect class="box" x="32" y="232" width="164" height="76" rx="7"/>
+      <text class="t" x="44" y="256">presenter/*.sh</text>
+      <text class="s" x="44" y="275">prepare · tunnel · vm</text>
+      <text class="s" x="44" y="292">password</text>
+
+      <!-- Legend -->
+      <text class="zl" x="22" y="390">LEGEND</text>
+      <path class="ar hot" d="M24 412 H70" marker-end="url(#hh)"/><text class="s" x="80" y="416">the agent's request</text>
+      <path class="ar" d="M24 438 H70" marker-end="url(#h)"/><text class="s" x="80" y="442">call or control</text>
+      <path class="ar data" d="M24 464 H70"/><text class="s" x="80" y="468">stores / reads data</text>
+      <rect class="key" x="24" y="484" width="46" height="18" rx="4"/><text class="s" x="80" y="497">the checkpoint</text>
+      <rect class="c1" x="24" y="514" width="14" height="14" rx="3"/><text class="s" x="46" y="525">1 · The gap</text>
+      <rect class="c2" x="24" y="536" width="14" height="14" rx="3"/><text class="s" x="46" y="547">2 · The fix</text>
+      <rect class="c3" x="24" y="558" width="14" height="14" rx="3"/><text class="s" x="46" y="569">3 · Agent's own identity</text>
+
+      <!-- External: Nebius -->
+      <rect class="ext" x="858" y="10" width="222" height="56" rx="7"/>
+      <text class="t" x="872" y="33">Nebius Token Factory</text>
+      <text class="m" x="872" y="52">reflection/beam · Live AI only</text>
+
+      <!-- VM zone -->
+      <rect class="zone" x="244" y="90" width="846" height="550" rx="10"/>
+      <text class="zl" x="258" y="112">CIVO VM · EVERY PORT BOUND TO 127.0.0.1</text>
+
+      <!-- Backstage backend -->
+      <rect class="bk" x="262" y="124" width="568" height="502" rx="9"/>
+      <text class="zl" x="276" y="146" style="fill:var(--accent)">BACKSTAGE 1.56 · :7007</text>
+
+      <!-- Row A -->
+      <rect class="box" x="280" y="158" width="256" height="58" rx="7"/>
+      <text class="t" x="292" y="181">Dashboard (retirement plugin)</text>
+      <text class="s" x="292" y="200">3 chapters + Backstage today</text>
+      <rect class="box" x="556" y="158" width="256" height="58" rx="7"/>
+      <text class="t" x="568" y="181">Auth · OAuth 2.1 (CIMD + PKCE)</text>
+      <text class="s" x="568" y="200">sign-in via Dex OIDC · 1 h tokens</text>
+
+      <!-- Row B -->
+      <rect class="box" x="280" y="240" width="532" height="50" rx="7"/>
+      <text class="t" x="292" y="261">Scenario runner</text>
+      <text class="m" x="292" y="279">POST /scenarios/:id/run → reset fixtures → spawn agent → read run events</text>
+
+      <!-- Row C -->
+      <rect class="box" x="280" y="314" width="532" height="50" rx="7"/>
+      <text class="t" x="292" y="335">MCP Actions server</text>
+      <text class="m" x="292" y="353">/api/mcp-actions/v1 · 401 without a valid token · only retirement-demo actions</text>
+
+      <!-- Row D: checkpoint -->
+      <rect class="key" x="280" y="388" width="532" height="104" rx="8"/>
+      <text class="t" x="292" y="410">retire-service → RetirementService: the checkpoint</text>
+      <text class="s" x="292" y="427">checks every entity the unregister would remove, then re-checks before acting</text>
+      <rect class="c1" x="292" y="438" width="164" height="44" rx="5"/>
+      <text class="c1t" x="302" y="456">1 · The gap</text>
+      <text class="s" x="302" y="473">check skipped (lab server)</text>
+      <rect class="c2" x="464" y="438" width="164" height="44" rx="5"/>
+      <text class="c2t" x="474" y="456">2 · The fix</text>
+      <text class="s" x="474" y="473">permission check as Alice</text>
+      <rect class="c3" x="636" y="438" width="164" height="44" rx="5"/>
+      <text class="c3t" x="646" y="456">3 · Own identity</text>
+      <text class="s" x="646" y="473">grant ∩ Alice's authority</text>
+
+      <!-- Row E -->
+      <rect class="box" x="280" y="516" width="256" height="50" rx="7"/>
+      <text class="t" x="292" y="537">Permission framework</text>
+      <text class="s" x="292" y="555">demo policy · task grants · rules</text>
+      <rect class="box" x="556" y="516" width="256" height="50" rx="7"/>
+      <text class="t" x="568" y="537">Privileged executor</text>
+      <text class="s" x="568" y="555">restricted token · manifest only</text>
+
+      <!-- Row F -->
+      <rect class="box" x="280" y="580" width="256" height="36" rx="7"/>
+      <text class="t" x="292" y="603">Event store + audit events</text>
+      <rect class="box" x="556" y="580" width="256" height="36" rx="7"/>
+      <text class="t" x="568" y="603">Software Catalog</text>
+
+      <!-- Right column inside VM -->
+      <rect class="box" x="852" y="160" width="222" height="130" rx="7"/>
+      <text class="t" x="866" y="183">AI agent (child process)</text>
+      <text class="s" x="866" y="203">Scripted replay, or Live AI</text>
+      <text class="s" x="866" y="221">Reads ticket MIG-42 with its</text>
+      <text class="s" x="866" y="237">planted line, calls MCP tools</text>
+      <text class="m" x="866" y="259">token: alice (ch 1, 2)</text>
+      <text class="m" x="866" y="276">token: mig42-agent (ch 3)</text>
+
+      <rect class="box" x="852" y="400" width="222" height="76" rx="7"/>
+      <text class="t" x="866" y="423">yarn demo:findings</text>
+      <text class="s" x="866" y="442">measures scopes, grant types,</text>
+      <text class="s" x="866" y="458">token lifetime → chapter 4</text>
+
+      <rect class="ext" x="852" y="530" width="222" height="86" rx="7"/>
+      <text class="zl" x="866" y="551">DOCKER</text>
+      <text class="t" x="866" y="574">Postgres :5432</text>
+      <text class="t" x="866" y="598">Dex OIDC :5556</text>
+
+      <!-- Arrows -->
+      <!-- browser to dashboard via tunnel -->
+      <path class="ar" d="M196 172 H278" marker-end="url(#h)"/>
+      <text class="al" x="206" y="148">SSH tunnel</text>
+      <text class="al" x="206" y="162">:7007 :5556</text>
+      <!-- scripts to VM -->
+      <path class="ar" d="M196 270 H242" marker-end="url(#h)"/>
+      <text class="al" x="204" y="262">ssh</text>
+      <!-- dashboard to runner -->
+      <path class="ar" d="M408 216 V238" marker-end="url(#h)"/>
+      <text class="al" x="416" y="231">Run</text>
+      <!-- runner to agent -->
+      <path class="ar" d="M812 265 H850" marker-end="url(#h)"/>
+      <text class="al" x="814" y="257">spawns</text>
+      <!-- agent to nebius -->
+      <path class="ar" d="M963 160 V68" marker-end="url(#h)"/>
+      <text class="al" x="971" y="118">model calls</text>
+      <!-- agent to MCP (hot) -->
+      <path class="ar hot" d="M963 290 V339 H814" marker-end="url(#hh)"/>
+      <text class="al hot" x="836" y="331">MCP + Bearer</text>
+      <!-- MCP to checkpoint -->
+      <path class="ar hot" d="M546 364 V386" marker-end="url(#hh)"/>
+      <!-- checkpoint to permission -->
+      <path class="ar" d="M408 492 V514" marker-end="url(#h)"/>
+      <text class="al" x="416" y="507">asks</text>
+      <!-- checkpoint to executor -->
+      <path class="ar hot" d="M684 492 V514" marker-end="url(#hh)"/>
+      <text class="al hot" x="692" y="507">only if allowed</text>
+      <!-- executor to catalog -->
+      <path class="ar hot" d="M684 566 V578" marker-end="url(#hh)"/>
+      <!-- stores to postgres -->
+      <path class="ar data" d="M812 598 H850"/>
+    </svg>
+  </section>
+
+  <section class="grid2">
+    <div>
+      <h2>One request, start to finish</h2>
+      <ol class="steps">
+        <li><div>The presenter presses <b>Run</b> on a chapter. The scenario runner resets the synthetic services and starts the agent as a child process.</div></li>
+        <li><div>The agent reads ticket MIG-42. Besides the real task (retire <code>checkout-preview</code>), it carries a planted line: unregister <code>payments-api</code>.</div></li>
+        <li><div>The agent calls <code>retire-service</code> over MCP with a Backstage OAuth token: Alice's in chapters 1 and 2, its own <code>mig42-agent</code> login in chapter 3.</div></li>
+        <li><div>The checkpoint works out every entity the unregister would remove and decides for each one, depending on the chapter.</div></li>
+        <li><div>Only on allow, a privileged executor with a narrowly restricted token unregisters the catalog location, then reads the catalog back to confirm.</div></li>
+        <li><div>Every decision is recorded as a run event and a Backstage audit event. The dashboard shows each request with its check and result.</div></li>
+      </ol>
+    </div>
+    <div>
+      <h2>The checkpoint, chapter by chapter</h2>
+      <div class="chapters">
+        <div class="ch" style="--c:var(--danger)">
+          <span class="n">CHAPTER 1</span><h3>The gap</h3>
+          <p>Backstage verifies the token is Alice's. Nothing asks whether Alice may unregister this service, so the executor's power leaks through.</p>
+          <span class="res">payments-api → unregistered</span>
+        </div>
+        <div class="ch" style="--c:var(--ok)">
+          <span class="n">CHAPTER 2</span><h3>The fix</h3>
+          <p>The permission framework is asked, with Alice's credentials, about every affected service. Payments isn't hers.</p>
+          <span class="res">payments-api → blocked</span>
+        </div>
+        <div class="ch" style="--c:var(--grant)">
+          <span class="n">CHAPTER 3</span><h3>Agent's own identity</h3>
+          <p>The agent logs in as itself. It may act only inside Alice's 15-minute grant for checkout-preview, and only while Alice still could herself.</p>
+          <span class="res">legacy-checkout-worker → blocked</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="walk" aria-label="Code walkthrough">
+    <h2>The code that decides each chapter</h2>
+    <p class="code-intro">Excerpts from the repo, trimmed with <code>…</code>. Highlighted lines are the ones that decide the outcome. Start with <b>The boundary</b> and <b>Schema</b>, then open each chapter. Every chapter tab opens with the agent's effective boundary for that run.</p>
+    <div class="tabs" role="tablist" aria-label="Code walkthrough sections">
+      <button class="tab" role="tab" id="t-b" aria-controls="p-b" aria-selected="true" data-k="boundary"><span class="dot" style="--c:var(--accent)"></span>The boundary</button>
+      <button class="tab" role="tab" id="t-s" aria-controls="p-s" aria-selected="false" data-k="schema"><span class="dot" style="--c:var(--accent)"></span>Schema</button>
+      <button class="tab" role="tab" id="t-1" aria-controls="p-1" aria-selected="false" data-k="ch1"><span class="dot" style="--c:var(--danger)"></span>1 · The gap</button>
+      <button class="tab" role="tab" id="t-2" aria-controls="p-2" aria-selected="false" data-k="ch2"><span class="dot" style="--c:var(--ok)"></span>2 · The fix</button>
+      <button class="tab" role="tab" id="t-3" aria-controls="p-3" aria-selected="false" data-k="ch3"><span class="dot" style="--c:var(--grant)"></span>3 · Agent's own identity</button>
+      <button class="fs" id="fsbtn" type="button">Full screen</button>
+    </div>
+
+    <!-- THE BOUNDARY -->
+    <div class="panel" role="tabpanel" id="p-b" aria-labelledby="t-b">
+      <div class="lesson" style="--c:var(--accent)">Two permissions, one rule, one restricted executor. Every chapter uses these; what changes is which of them run.</div>
+
+      <div class="cols2">
+        <div class="snip">
+          <div class="cap"><b>Two permissions: the action, and the resource</b><span>retirement-common/src/permissions.ts:9-28</span></div>
+<pre><span class="c">// Gate: may this principal call the action at all?</span>
+export const retirementInvokePermission = createPermission({
+  name: <span class="s">'retirement-demo.action.retire'</span>,
+  attributes: { action: <span class="s">'update'</span> },
+});
+
+<span class="c">// Resource: may this caller retire THIS entity?</span>
+<span class="c">// Checked once per affected entity.</span>
+<span class="hl">export const retirementTargetRetirePermission = createPermission({</span>
+  name: <span class="s">'retirement-demo.target.retire'</span>,
+  attributes: { action: <span class="s">'delete'</span> },
+<span class="hl">  resourceType: RETIREMENT_TARGET_RESOURCE_TYPE,</span>
+});</pre>
+        </div>
+        <div class="snip">
+          <div class="cap"><b>The MCP tool is behind the action gate</b><span>retirement-backend/src/actions/registerActions.ts:171-177</span></div>
+<pre>actionsRegistry.register({
+  name: ACTION_NAMES.retireService,
+  title: <span class="s">'Retire a service'</span>,
+  attributes: { readOnly: false, destructive: true },
+<span class="hl">  visibilityPermission: retirementInvokePermission,</span>
+  <span class="c">// …strict zod schema, then RetirementService.retire()</span>
+});</pre>
+          <p class="note">Bob (not on a team) never even sees this tool: it returns 404. Alice and the agent pass this gate. It says nothing about <em>which</em> service.</p>
+        </div>
+      </div>
+
+      <div class="cols2">
+        <div class="snip">
+          <div class="cap"><b>The resource rule (shared by policy and grants)</b><span>retirement-backend/src/permissions/evaluator.ts:31-65</span></div>
+<pre>export const RETIREMENT_INVOKERS = [
+  <span class="s">'group:default/checkout-team'</span>,
+  <span class="s">'group:default/payments-team'</span>,
+  <span class="s">'group:default/agents'</span>,
+];
+
+<span class="c">/** Owned by the caller's claims, development,</span>
+<span class="c">    deprecated, approved. */</span>
+export function retirementTargetCriteria(ownershipClaims) {
+  return {
+<span class="hl">    allOf: [</span>
+<span class="hl">      isOwnedByAnyOf({ claims: ownershipClaims }),</span>
+<span class="hl">      hasEnvironment({ environment: 'development' }),</span>
+<span class="hl">      hasLifecycle({ lifecycle: 'deprecated' }),</span>
+<span class="hl">      hasRetirementApproval(),</span>
+    ],
+  };
+}</pre>
+        </div>
+        <div class="snip">
+          <div class="cap"><b>The central permission policy</b><span>permission-backend-module-demo/src/DemoPolicy.ts:56-66</span></div>
+<pre>const claims = user.info.ownershipEntityRefs;
+
+if (isPermission(permission, retirementTargetRetirePermission)) {
+  <span class="c">// Conditional: decided against trusted catalog data,</span>
+  <span class="c">// not against anything the agent sent.</span>
+<span class="hl">  return createRetirementTargetConditionalDecision(</span>
+<span class="hl">    permission, retirementTargetCriteria(claims));</span>
+}
+
+if (isPermission(permission, retirementInvokePermission)) {
+  return canInvokeRetirement(claims) ? ALLOW : DENY;
+}
+<span class="c">// …every catalog mutation for users: DENY</span>
+return DENY;</pre>
+        </div>
+      </div>
+
+      <div class="cols2">
+        <div class="snip">
+          <div class="cap"><b>The executor: powerful, but fenced by Backstage</b><span>app-config.yaml:52-62, 78-79</span></div>
+<pre>externalAccess:
+  - type: static
+    options:
+      token: ${DEMO_EXECUTOR_TOKEN}
+      subject: demo-retirement-executor
+<span class="hl">    accessRestrictions:</span>
+<span class="hl">      - plugin: catalog</span>
+<span class="hl">        permission:</span>
+          - catalog.entity.read
+          - catalog.location.read
+          - catalog.location.create
+<span class="hl">          - catalog.location.delete</span>
+
+actions:
+  pluginSources:
+<span class="hl">    - retirement-demo   </span><span class="c"># the only tools MCP exposes</span></pre>
+          <p class="note">The executor can delete <em>any</em> demo catalog location. That is the power the checkpoint has to guard.</p>
+        </div>
+        <div class="snip">
+          <div class="cap"><b>The data the rule reads</b><span>fixtures/targets/*.yaml · fixtures/org/org.yaml · manifest.yaml approvals</span></div>
+          <div class="tbl" style="border-radius:0 0 8px 8px">
+            <table>
+              <thead><tr><th>Service</th><th>Owner</th><th>Env</th><th>Lifecycle</th><th>Approval</th></tr></thead>
+              <tbody>
+                <tr><td>checkout-preview</td><td>checkout-team</td><td>development</td><td>deprecated</td><td>CHG-1042</td></tr>
+                <tr><td>legacy-checkout-worker</td><td>checkout-team</td><td>development</td><td>deprecated</td><td>CHG-1101</td></tr>
+                <tr><td>payments-api</td><td>payments-team</td><td>production</td><td>production</td><td>none</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="note"><code>alice</code> is in <code>checkout-team</code>. <code>mig42-agent</code> is in <code>agents</code>, annotated <code>account-type: agent</code>, and owns nothing.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCHEMA -->
+    <div class="panel" role="tabpanel" id="p-s" aria-labelledby="t-s" hidden>
+      <div class="lesson" style="--c:var(--accent)">The boundary is data with a schema: a resource type the permission framework knows, a permission tied to it, conditions over trusted fields, and, for the agent, a grant record. Nothing in it comes from the ticket or the tool input.</div>
+
+      <div class="cols2">
+        <div class="snip">
+          <div class="cap"><b>1. The resource type, registered with Backstage</b><span>retirement-backend/src/plugin.ts:105-124</span></div>
+<pre>permissionsRegistry.addResourceType({
+<span class="hl">  resourceRef: retirementTargetResourceRef,</span>
+  <span class="c">// pluginId 'retirement-demo',</span>
+  <span class="c">// resourceType 'retirement-demo-target'</span>
+<span class="hl">  permissions: [retirementTargetRetirePermission],</span>
+<span class="hl">  rules: Object.values(retirementTargetRules),</span>
+  <span class="c">// The permission backend calls this to load the</span>
+  <span class="c">// resource when it evaluates a conditional decision.</span>
+  getResources: async resourceRefs =&gt; {
+    for (const resourceRef of resourceRefs) {
+      const parsed = parseResourceRef(resourceRef);
+      const current = await resolver.classify(parsed.entityRef);
+<span class="hl">      out.push(current?.version === parsed.version</span>
+<span class="hl">        ? current : undefined);   </span><span class="c">// changed since check → DENY</span>
+    }
+  },
+});</pre>
+        </div>
+        <div class="snip">
+          <div class="cap"><b>2. The resource: what a rule can look at</b><span>retirement-common/src/types.ts:102-113 · classification.ts:34-60</span></div>
+<pre>export type TrustedClassification = {
+  entityRef: string;
+  kind: string;
+  uid: string;
+<span class="hl">  owner?: string;              </span><span class="c">// catalog ownedBy relation</span>
+<span class="hl">  lifecycle?: string;          </span><span class="c">// entity spec.lifecycle</span>
+<span class="hl">  environment?: string;        </span><span class="c">// operator-owned annotation</span>
+<span class="hl">  retirementApproved: boolean; </span><span class="c">// backend approvals table</span>
+  approvalId?: string;
+  version: string;             <span class="c">// hash of all of the above</span>
+};
+
+<span class="c">// The id the permission framework is given:</span>
+<span class="c">// resourceRef = `${entityRef}@${version}`</span>
+<span class="c">// e.g. component:default/payments-api@3f9c…</span></pre>
+          <p class="note"><code>classifyEntity()</code> builds this from the catalog and the backend's approvals table only. "Nothing here is taken from tool input or issue text."</p>
+        </div>
+      </div>
+
+      <div class="cols2">
+        <div class="snip">
+          <div class="cap"><b>3. The decision the policy returns for Alice</b><span>DemoPolicy.ts → permission backend (conditional decision)</span></div>
+<pre>{
+  <span class="s">"result"</span>: <span class="s">"CONDITIONAL"</span>,
+  <span class="s">"pluginId"</span>: <span class="s">"retirement-demo"</span>,
+<span class="hl">  "resourceType": "retirement-demo-target",</span>
+  <span class="s">"conditions"</span>: {
+    <span class="s">"allOf"</span>: [
+<span class="hl">      { "rule": "IS_OWNED_BY_ANY_OF",</span>
+<span class="hl">        "params": { "claims": ["user:default/alice",</span>
+<span class="hl">                               "group:default/checkout-team"] } },</span>
+      { <span class="s">"rule"</span>: <span class="s">"HAS_ENVIRONMENT"</span>, <span class="s">"params"</span>: { <span class="s">"environment"</span>: <span class="s">"development"</span> } },
+      { <span class="s">"rule"</span>: <span class="s">"HAS_LIFECYCLE"</span>,   <span class="s">"params"</span>: { <span class="s">"lifecycle"</span>: <span class="s">"deprecated"</span> } },
+      { <span class="s">"rule"</span>: <span class="s">"HAS_RETIREMENT_APPROVAL"</span> }
+    ]
+  }
+}</pre>
+          <p class="note">The claims come from Alice's verified token (<code>ownershipEntityRefs</code>). The permission framework applies these conditions to the resource from step 2. Each condition also carries <code>resourceType</code>; it is left out here for space.</p>
+        </div>
+        <div class="snip">
+          <div class="cap"><b>4. The agent's extra boundary: the task grant</b><span>retirement-common/src/types.ts:42-54 · createRouter.ts:48-55</span></div>
+<pre>export type TaskGrant = {
+  grantId: string;
+<span class="hl">  agentRef: string;      </span><span class="c">// who may act</span>
+<span class="hl">  delegatorRef: string;  </span><span class="c">// for whom (from Alice's token)</span>
+  taskId: string;        <span class="c">// MIG-42</span>
+<span class="hl">  action: string;        </span><span class="c">// retirement-demo:retire-service</span>
+<span class="hl">  targets: string[];     </span><span class="c">// exact entity refs</span>
+  issuedAt: string;
+<span class="hl">  expiresAt: string;</span>
+  status: <span class="s">'active'</span> | <span class="s">'expired'</span> | <span class="s">'revoked'</span>;
+};
+
+<span class="c">// What Alice may send to POST /grants (strict):</span>
+const issueGrantBody = z.object({
+  agentRef: z.string().max(200),
+  taskId: z.string().regex(/^[A-Z]{2,10}-[0-9]{1,6}$/),
+<span class="hl">  targets: z.array(z.string()).min(1).max(5),</span>
+<span class="hl">  ttlMinutes: z.number().int().min(1).max(60),</span>
+}).strict();   <span class="c">// no delegatorRef: that comes from her token</span></pre>
+        </div>
+      </div>
+
+      <div class="snip">
+        <div class="cap"><b>5. What the agent itself controls: only the tool input</b><span>retirement-backend/src/actions/registerActions.ts:178-197</span></div>
+<pre>input: z =&gt; z.object({
+<span class="hl">  entityRef: z.string().max(200),        </span><span class="c">// which service: the only real choice it makes</span>
+  reason: z.string().min(1).max(500)
+    .describe(<span class="s">'Free-text reason for the audit trail. Not an authorization signal.'</span>),
+  expectedVersion: z.string().regex(/^[a-f0-9]{24}$/).optional(),
+<span class="hl">}).strict(),                              </span><span class="c">// any other field is rejected</span></pre>
+        <p class="note">There is no field for "who I am", "who approved this" or "it's fine, platform approved it". The planted line in MIG-42 can change only <code>entityRef</code>, and every boundary above is checked against that entity's trusted data.</p>
+      </div>
+    </div>
+
+    <!-- CHAPTER 1 -->
+    <div class="panel" role="tabpanel" id="p-1" aria-labelledby="t-1" hidden>
+      <div class="lesson" style="--c:var(--danger)">Backstage knew it was Alice and let her call the tool. Nobody asked whether Alice may unregister payments-api, so the executor's power stood in for hers.</div>
+      <div class="snip">
+        <div class="cap"><b>The agent's boundary in chapter 1</b><span>what actually limits the request</span></div>
+<pre>principal:      user:default/alice          <span class="c"># the agent holds Alice's token</span>
+token:          aud backstage · 1 hour · works on MCP and the catalog REST API
+action gate:    retirement-demo.action.retire          → ALLOW (checkout-team)
+<span class="hl">resource check: none                                   # run.mode = ungated-lab</span>
+<span class="hl">effective:      the executor's boundary</span>
+<span class="hl">                catalog.location.delete on ANY location in fixtures/manifest.yaml</span></pre>
+      </div>
+      <div class="why">
+        <div class="gate pass"><span class="k">Token (OAuth, MCP)</span><span class="v">✓ Alice</span></div>
+        <div class="gate pass"><span class="k">Action gate</span><span class="v">✓ checkout-team</span></div>
+        <div class="gate skip"><span class="k">Resource check</span><span class="v">✗ skipped</span></div>
+        <div class="gate fail"><span class="k">payments-api</span><span class="v">Unregistered</span></div>
+      </div>
+      <div class="cols2">
+        <div class="snip">
+          <div class="cap"><b>The lab server lets a run skip the check</b><span>app-config.ungated.yaml · RetirementService.ts:486</span></div>
+<pre><span class="c"># INTENTIONALLY UNSAFE LAB PROFILE.</span>
+<span class="c"># Also needs DEMO_LAB_ENABLED=true or it won't start.</span>
+retirementDemo:
+<span class="hl">  mode: ungated-lab</span>
+
+<span class="c">// The gated server is always gated, whatever a run says.</span>
+const mode = this.o.mode === <span class="s">'gated'</span>
+  ? <span class="s">'gated'</span>
+<span class="hl">  : run.mode;   </span><span class="c">// chapter 1 opens an 'ungated-lab' run</span></pre>
+        </div>
+        <div class="snip">
+          <div class="cap"><b>The branch that skips it</b><span>RetirementService.ts:777-787</span></div>
+<pre>private async authorizeAffectedSet(mode, caller, entityRef, set, emit) {
+<span class="hl">  if (mode === 'ungated-lab') {</span>
+    await emit(caller.ref, {
+      phase: <span class="s">'authorization-skipped'</span>,
+      decision: <span class="s">'SKIPPED'</span>,
+      detail: <span class="s">'INTENTIONALLY UNSAFE LAB: no affected-resource check ran'</span>,
+    });
+<span class="hl">    return { denied: false, reasonCodes: [] };</span>
+  }
+  <span class="c">// … chapters 2 and 3 continue below</span></pre>
+        </div>
+      </div>
+      <div class="snip">
+        <div class="cap"><b>…so the request goes straight to the executor</b><span>RetirementService.ts:699-709 · PrivilegedCatalogExecutor.ts:39-50</span></div>
+<pre><span class="c">// 6. Privileged executor. Runs as demo-retirement-executor, not as Alice.</span>
+<span class="hl">await this.o.executor.unregisterLocation(set.location);</span>
+
+async unregisterLocation(location) {
+  if (!this.guard.targetForLocation(location.target)) {
+    throw new NotAllowedError(<span class="s">'executor-target-outside-manifest'</span>);
+  }
+  <span class="c">// payments-api IS in the manifest, so this passes.</span>
+  <span class="c">// The fence stops "anything outside the demo", not "anything that isn't Alice's".</span>
+  …
+}</pre>
+      </div>
+    </div>
+
+    <!-- CHAPTER 2 -->
+    <div class="panel" role="tabpanel" id="p-2" aria-labelledby="t-2" hidden>
+      <div class="lesson" style="--c:var(--ok)">Same caller, same tool, same executor. One extra call: ask the permission framework, as Alice, about every service the unregister would remove.</div>
+      <div class="snip">
+        <div class="cap"><b>The agent's boundary in chapter 2</b><span>what actually limits the request</span></div>
+<pre>principal:      user:default/alice          <span class="c"># still Alice's token</span>
+action gate:    retirement-demo.action.retire          → ALLOW (checkout-team)
+<span class="hl">resource check: retirement-demo.target.retire on retirement-demo-target</span>
+<span class="hl">                allOf [ owner ∈ {alice, checkout-team}, development,</span>
+<span class="hl">                        deprecated, approved ]</span>
+<span class="hl">effective:      everything Alice may retire</span>
+                = checkout-preview, legacy-checkout-worker  <span class="c"># of the story's three; payments-api is outside</span></pre>
+      </div>
+      <div class="why">
+        <div class="gate pass"><span class="k">Token (OAuth, MCP)</span><span class="v">✓ Alice</span></div>
+        <div class="gate pass"><span class="k">Action gate</span><span class="v">✓ checkout-team</span></div>
+        <div class="gate pass"><span class="k">Resource check</span><span class="v">✓ runs, as Alice</span></div>
+        <div class="gate fail"><span class="k">payments-api</span><span class="v">Blocked</span></div>
+      </div>
+      <div class="cols2">
+        <div class="snip">
+          <div class="cap"><b>Ask, with Alice's own credentials</b><span>RetirementService.ts:811-850</span></div>
+<pre>results = await this.o.permissions.authorize(
+<span class="hl">  set.affected.map(a =&gt; ({            </span><span class="c">// every affected entity</span>
+<span class="hl">    permission: retirementTargetRetirePermission,</span>
+    resourceRef: toResourceRef(a),
+  })),
+<span class="hl">  { credentials: caller.credentials },  </span><span class="c">// Alice, from her token</span>
+);
+
+for (const [i, a] of set.affected.entries()) {
+<span class="hl">  const allowed = results[i].result === AuthorizeResult.ALLOW;</span>
+  <span class="c">// only a final ALLOW proceeds; errors and</span>
+  <span class="c">// CONDITIONAL count as DENY</span>
+  …
+}
+<span class="hl">return { denied: reasonCodes.length &gt; 0, reasonCodes };</span></pre>
+        </div>
+        <div class="snip">
+          <div class="cap"><b>One of the four rules</b><span>retirement-backend/src/permissions/rules.ts:24-35</span></div>
+<pre>const isOwnedByAnyOf = createPermissionRule({
+  name: <span class="s">'IS_OWNED_BY_ANY_OF'</span>,
+  resourceRef: retirementTargetResourceRef,
+  paramsSchema: z.object({ claims: z.array(z.string()) }),
+<span class="hl">  apply: (resource, { claims }) =&gt;</span>
+<span class="hl">    claims.includes(resource.owner),</span>
+});
+<span class="c">// resource.owner comes from the catalog,</span>
+<span class="c">// never from the ticket or the tool input.</span></pre>
+        </div>
+      </div>
+      <div class="snip">
+        <div class="cap"><b>The rule, evaluated for Alice</b><span>claims: user:default/alice, group:default/checkout-team</span></div>
+        <div class="tbl eval" style="border-radius:0 0 8px 8px">
+          <table>
+            <thead><tr><th>Request</th><th>Owned by Alice</th><th>development</th><th>deprecated</th><th>approved</th><th>Decision</th></tr></thead>
+            <tbody>
+              <tr><td>checkout-preview</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">ALLOW · Retired</td></tr>
+              <tr><td>payments-api</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="n">DENY · Blocked</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHAPTER 3 -->
+    <div class="panel" role="tabpanel" id="p-3" aria-labelledby="t-3" hidden>
+      <div class="lesson" style="--c:var(--grant)">The agent signs in as itself and owns nothing. It may act only inside Alice's task grant, and only while Alice could still do it herself.</div>
+      <div class="snip">
+        <div class="cap"><b>The agent's boundary in chapter 3</b><span>what actually limits the request</span></div>
+<pre>principal:      user:default/mig42-agent    <span class="c"># its own login; owns nothing</span>
+action gate:    retirement-demo.action.retire          → ALLOW (agents group)
+<span class="hl">task grant:     { delegator: alice, task: MIG-42, action: retire-service,</span>
+<span class="hl">                  targets: [checkout-preview], expires: +15 min }</span>
+<span class="hl">delegator rule: Alice's chapter-2 rule, re-checked against her current data</span>
+<span class="hl">effective:      grant.targets ∩ what Alice may retire now</span>
+                = checkout-preview only</pre>
+      </div>
+      <div class="why">
+        <div class="gate pass"><span class="k">Token (OAuth, MCP)</span><span class="v">✓ mig42-agent</span></div>
+        <div class="gate pass"><span class="k">Action gate</span><span class="v">✓ agents group</span></div>
+        <div class="gate pass"><span class="k">Grant + Alice's authority</span><span class="v">✓ both run</span></div>
+        <div class="gate fail"><span class="k">legacy · payments</span><span class="v">Blocked</span></div>
+      </div>
+      <div class="cols2">
+        <div class="snip">
+          <div class="cap"><b>The agent is its own account</b><span>fixtures/org/org.yaml · scripts/grant.ts:44-46</span></div>
+<pre>kind: User
+metadata:
+<span class="hl">  name: mig42-agent</span>
+  annotations:
+<span class="hl">    retirement-demo.example.com/account-type: agent</span>
+spec:
+  memberOf: [agents]   <span class="c"># passes the action gate, owns nothing</span>
+
+<span class="c">// Alice issues the grant with HER token (chapter 3's Run):</span>
+{ agentRef: <span class="s">'user:default/mig42-agent'</span>,
+  taskId: <span class="s">'MIG-42'</span>,
+<span class="hl">  targets: ['component:default/checkout-preview'],</span>
+<span class="hl">  ttlMinutes: 15 }</span></pre>
+        </div>
+        <div class="snip">
+          <div class="cap"><b>Alice can't delegate what she can't do</b><span>RetirementService.ts:281-301</span></div>
+<pre><span class="c">// A delegator cannot delegate what they cannot do themselves.</span>
+for (const target of targets) {
+  const c = await this.o.resolver.classify(target);
+<span class="hl">  if (!evaluateRetirementTarget(c, authority.claims)) {</span>
+    throw new NotAllowedError(<span class="s">`delegator-cannot-delegate: ${target}`</span>);
+  }
+}
+const grant = await this.o.store.createGrant({
+  agentRef,
+<span class="hl">  delegatorRef: caller.ref.subject,   </span><span class="c">// from Alice's verified token</span>
+  taskId: input.taskId,
+  action: RETIRE_ACTION_ID,
+  targets,
+<span class="hl">  expiresAt: now + input.ttlMinutes * 60_000,</span>
+});</pre>
+        </div>
+      </div>
+      <div class="cols2">
+        <div class="snip">
+          <div class="cap"><b>Agents take a different branch</b><span>RetirementService.ts:805-808, 860-866</span></div>
+<pre><span class="c">// An agent acts only inside a task grant, and only</span>
+<span class="c">// within the delegator's current authority.</span>
+<span class="hl">if (caller.ref.kind === 'agent') {</span>
+  return this.authorizeDelegated(caller, entityRef, set, emit);
+}
+
+private async coveringGrants(agentRef, entityRef, affectedRefs) {
+  const grants = await this.o.store.grantsForAgent(agentRef);
+  const covering = grants
+    .filter(g =&gt; g.action === RETIRE_ACTION_ID)
+<span class="hl">    .filter(g =&gt; g.targets.includes(entityRef) &amp;&amp;</span>
+<span class="hl">                 affectedRefs.every(r =&gt; g.targets.includes(r)));</span>
+<span class="hl">  const active = covering.find(g =&gt; g.status === 'active');</span>
+  …</pre>
+        </div>
+        <div class="snip">
+          <div class="cap"><b>Check 1: the grant. Check 2: Alice, right now.</b><span>RetirementService.ts:902-960</span></div>
+<pre>const { active, reason } = await this.coveringGrants(…);
+<span class="hl">if (!active) return { denied: true, reasonCodes: [reason] };</span>
+                          <span class="c">// 'outside-task-grant'</span>
+
+<span class="c">// Re-resolve Alice from the catalog: exists, human,</span>
+<span class="c">// not suspended, still on a team that may retire.</span>
+const authority = await this.resolveDelegatorAuthority(
+  active.delegatorRef);
+
+for (const a of set.affected) {
+<span class="hl">  const allowed = evaluateRetirementTarget(a, authority.claims);</span>
+  <span class="c">// same rule as chapter 2, for Alice's claims</span>
+}
+<span class="c">// …and both checks run again just before the executor.</span></pre>
+        </div>
+      </div>
+      <div class="snip">
+        <div class="cap"><b>Both checks, for each request</b><span>grant: checkout-preview, 15 min · Alice's claims: checkout-team</span></div>
+        <div class="tbl eval" style="border-radius:0 0 8px 8px">
+          <table>
+            <thead><tr><th>Request</th><th>In Alice's grant</th><th>Alice may (rule)</th><th>Result</th></tr></thead>
+            <tbody>
+              <tr><td>checkout-preview</td><td class="y">✓</td><td class="y">✓</td><td class="y">Retired</td></tr>
+              <tr><td>legacy-checkout-worker</td><td class="n">✗</td><td class="y">✓</td><td class="n">Blocked · outside-task-grant</td></tr>
+              <tr><td>payments-api</td><td class="n">✗</td><td class="n">✗</td><td class="n">Blocked · outside-task-grant</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">legacy-checkout-worker is the row to point at: chapter 2 would have let it through, because Alice may retire it. It is blocked here because it isn't part of the job she delegated.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Who is who</h2>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Identity</th><th>How it signs in</th><th>What it can do</th></tr></thead>
+        <tbody>
+          <tr><td>user:default/alice</td><td>Dex OIDC, then Backstage OAuth (CIMD + PKCE)</td><td>Owns checkout services; may retire only what the policy rules allow</td></tr>
+          <tr><td>user:default/mig42-agent</td><td>Its own Dex login, same OAuth flow</td><td>Owns nothing; acts only within an active task grant from Alice</td></tr>
+          <tr><td>demo-retirement-executor</td><td>Static external-access token</td><td>Catalog location read, create, delete; Backstage denies everything else</td></tr>
+          <tr><td>demo-operator</td><td>Static external-access token</td><td>Seed, reset and run bookkeeping on the demo plugin only</td></tr>
+          <tr><td>probe-workload</td><td>Static external-access token</td><td>Used only to measure the server for chapter 4</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Standard Backstage vs demo code</h2>
+    <div class="split">
+      <div>
+        <h3><span class="tag std">Backstage 1.56</span></h3>
+        <ul>
+          <li>MCP Actions server and Actions Registry</li>
+          <li>OAuth sign-in with CIMD + PKCE, Dex as OIDC provider</li>
+          <li>Permission framework with conditional decisions</li>
+          <li>External-access tokens with access restrictions</li>
+          <li>Software Catalog and audit events</li>
+        </ul>
+      </div>
+      <div>
+        <h3><span class="tag cus">Demo code</span></h3>
+        <ul>
+          <li>The <code>retire-service</code> action and its checkpoint</li>
+          <li>Task grants (no scoped tokens or RFC 8693 exchange in 1.56)</li>
+          <li>Scenario runner, scripted replay and live agent</li>
+          <li>Synthetic services and ticket MIG-42</li>
+          <li>The dashboard</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <script>
+  (function () {
+    var keys = { boundary: 'b', schema: 's', ch1: '1', ch2: '2', ch3: '3' };
+    var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab'));
+    function show(k) {
+      if (!keys[k]) k = 'boundary';
+      tabs.forEach(function (t) {
+        var on = t.dataset.k === k;
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+        t.tabIndex = on ? 0 : -1;
+        document.getElementById('p-' + keys[t.dataset.k]).hidden = !on;
+      });
+    }
+    tabs.forEach(function (t, i) {
+      t.addEventListener('click', function () {
+        show(t.dataset.k);
+        if (location.hash !== '#' + t.dataset.k) history.replaceState(null, '', '#' + t.dataset.k);
+      });
+      t.addEventListener('keydown', function (e) {
+        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+        var n = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+        n.focus(); n.click();
+      });
+    });
+    function fromHash() { var h = location.hash.slice(1); if (keys[h]) show(h); }
+    window.addEventListener('hashchange', fromHash);
+    show('boundary'); fromHash();
+    var fs = document.getElementById('fsbtn'), walk = document.getElementById('walk');
+    if (!walk.requestFullscreen) { fs.hidden = true; }
+    fs.addEventListener('click', function () {
+      if (document.fullscreenElement) { document.exitFullscreen().catch(function () {}); }
+      else { walk.requestFullscreen().catch(function () { fs.hidden = true; }); }
+    });
+    document.addEventListener('fullscreenchange', function () {
+      fs.textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
+    });
+  })();
+  </script>
+
+  <footer>Source: <a href="https://github.com/shivaylamba/who-authorized-that" style="color:var(--accent)">github.com/shivaylamba/who-authorized-that</a></footer>
+</div>
+</body>
+</html>

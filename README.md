@@ -70,8 +70,21 @@ Details: [`docs/setup.md`](docs/setup.md). Presenting on stage:
 
 ## Docs
 
+**Architecture and code walkthrough:** [`website/index.html`](website/index.html), a static page with
+the system diagram, the request path, and the code and schema behind each chapter (the
+permission boundary, the resource type, the policy's conditional decision and the task grant).
+Open it locally in a browser, or deploy it to Vercel:
+
+```sh
+npx vercel deploy --prod   # vercel.json serves website/ as-is; no install or build step
+```
+
+Importing the repo in the Vercel dashboard works too: `vercel.json` sets the output directory
+to `website` and skips the Yarn install.
+
 | Doc | What it covers |
 | --- | --- |
+| [`website/index.html`](website/index.html) | Architecture diagram and the code that decides each chapter |
 | [`docs/presenter-guide.md`](docs/presenter-guide.md) | Talk day checklist, the script for each chapter, troubleshooting |
 | [`docs/setup.md`](docs/setup.md) | Install, commands, live AI, connecting your own MCP client |
 | [`docs/how-it-works.md`](docs/how-it-works.md) | Identities, the execution path and its checks, task grants, known limits |
@@ -90,3 +103,4 @@ Details: [`docs/setup.md`](docs/setup.md). Presenting on stage:
 | `scripts` | Operator CLI: start, reset, login, replay, live agent, measurements, tests |
 | `presenter` | Laptop helpers for running the demo on a remote VM |
 | `clients` | Example MCP client configuration |
+| `website` | Static architecture and code walkthrough page (served by Vercel via `vercel.json`) |
