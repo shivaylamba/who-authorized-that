@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "who-authorized-that": {
+      "type": "http",
+      "url": "http://localhost:7007/api/mcp-actions/v1"
+    }
+  }
+}

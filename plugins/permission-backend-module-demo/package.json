@@ -1,0 +1,41 @@
+{
+  "name": "@internal/plugin-permission-backend-module-demo",
+  "description": "Central permission policy for the Who Authorized That? demo",
+  "version": "0.1.0",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "license": "UNLICENSED",
+  "private": true,
+  "publishConfig": {
+    "access": "public",
+    "main": "dist/index.cjs.js",
+    "types": "dist/index.d.ts"
+  },
+  "backstage": {
+    "role": "backend-plugin-module",
+    "pluginId": "permission",
+    "pluginPackage": "@backstage/plugin-permission-backend"
+  },
+  "scripts": {
+    "start": "backstage-cli package start",
+    "build": "backstage-cli package build",
+    "lint": "backstage-cli package lint",
+    "test": "backstage-cli package test",
+    "clean": "backstage-cli package clean"
+  },
+  "dependencies": {
+    "@backstage/backend-plugin-api": "^1.11.0",
+    "@backstage/plugin-catalog-common": "^1.1.10",
+    "@backstage/plugin-permission-common": "^0.9.12",
+    "@backstage/plugin-permission-node": "^0.11.5",
+    "@internal/plugin-retirement-backend": "workspace:^",
+    "@internal/plugin-retirement-common": "workspace:^"
+  },
+  "devDependencies": {
+    "@backstage/cli": "^0.36.7",
+    "@backstage/backend-test-utils": "^1.11.4"
+  },
+  "files": [
+    "dist"
+  ]
+}

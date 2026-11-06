@@ -1,0 +1,100 @@
+{
+  "name": "who-authorized-that",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": "22 || 24"
+  },
+  "scripts": {
+    "start": "backstage-cli repo start",
+    "build:backend": "yarn workspace backend build",
+    "build:all": "backstage-cli repo build --all",
+    "build-image": "yarn workspace backend build-image",
+    "tsc": "tsc",
+    "tsc:full": "tsc --skipLibCheck false --incremental false",
+    "clean": "backstage-cli repo clean",
+    "test": "backstage-cli repo test",
+    "test:all": "backstage-cli repo test --coverage",
+    "test:e2e": "playwright test",
+    "fix": "backstage-cli repo fix",
+    "lint": "backstage-cli repo lint --since origin/main",
+    "lint:all": "backstage-cli repo lint",
+    "prettier:check": "prettier --check .",
+    "new": "backstage-cli new",
+    "demo:env:init": "tsx scripts/env-init.ts",
+    "demo:infra:up": "docker compose --env-file .env up -d --wait",
+    "demo:infra:down": "docker compose --env-file .env down",
+    "demo:build": "yarn tsc && yarn workspace app build",
+    "demo:doctor": "tsx scripts/doctor.ts",
+    "demo:start:gated": "tsx scripts/start.ts gated",
+    "demo:start:ungated": "tsx scripts/start.ts ungated-lab",
+    "demo:stop": "tsx scripts/start.ts stop",
+    "demo:seed": "tsx scripts/operator.ts seed",
+    "demo:reset": "tsx scripts/operator.ts reset",
+    "demo:login": "tsx scripts/login.ts",
+    "demo:replay": "tsx scripts/replay.ts",
+    "demo:replay:direct": "tsx scripts/replay.ts --direct",
+    "demo:verify": "tsx scripts/verify.ts",
+    "demo:compare": "tsx scripts/compare.ts",
+    "demo:export": "tsx scripts/operator.ts export",
+    "demo:wipe-evidence": "tsx scripts/operator.ts wipe-evidence",
+    "demo:test": "tsx scripts/test.ts",
+    "demo:test:unit": "backstage-cli repo test --ci",
+    "demo:test:e2e": "tsx scripts/e2e.ts",
+    "demo:rehearse": "tsx scripts/rehearse.ts",
+    "demo:live": "tsx scripts/live-agent.ts",
+    "demo:live:batch": "tsx scripts/live-agent.ts --trials 5",
+    "demo:replay:agent": "tsx scripts/replay.ts --agent",
+    "demo:findings": "tsx scripts/findings.ts",
+    "demo:grant": "tsx scripts/grant.ts",
+    "demo:live:agent": "tsx scripts/live-agent.ts --as mig42-agent",
+    "demo:dashboard-smoke": "tsx scripts/dashboard-smoke.ts"
+  },
+  "backstage": {
+    "cli": {
+      "new": {
+        "globals": {
+          "license": "UNLICENSED"
+        }
+      }
+    }
+  },
+  "workspaces": [
+    "packages/*",
+    "plugins/*"
+  ],
+  "devDependencies": {
+    "@backstage/cli": "^0.36.7",
+    "@backstage/cli-defaults": "^0.1.7",
+    "@backstage/e2e-test-utils": "^0.1.2",
+    "@jest/environment-jsdom-abstract": "^30.5.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@playwright/test": "^1.32.3",
+    "@types/jest": "^30.0.0",
+    "bcryptjs": "^3.0.2",
+    "dotenv": "^16.4.5",
+    "jest": "^30.5.0",
+    "jsdom": "^27.1.0",
+    "node-gyp": "^10.0.0",
+    "prettier": "^2.3.2",
+    "tsx": "^4.19.2",
+    "typescript": "~5.8.0",
+    "yaml": "^2.0.0"
+  },
+  "resolutions": {
+    "@yarnpkg/core": "4.9.1",
+    "@types/react": "^18",
+    "@types/react-dom": "^18"
+  },
+  "prettier": "@backstage/cli/config/prettier",
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs,cjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
+  },
+  "packageManager": "yarn@4.13.0"
+}

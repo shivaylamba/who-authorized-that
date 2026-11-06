@@ -1,0 +1,30 @@
+# Test-only mixed-owner location. Unregistering this location removes BOTH
+# components, so authorizing checkout-lint-bot alone must not be enough.
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: checkout-lint-bot
+  title: checkout-lint-bot
+  description: Lint bot for checkout repositories (synthetic).
+  annotations:
+    retirement-demo.example.com/managed: 'true'
+    retirement-demo.example.com/environment: development
+spec:
+  type: service
+  lifecycle: deprecated
+  owner: group:default/checkout-team
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: payments-ledger-sandbox
+  title: payments-ledger-sandbox
+  description: Ledger sandbox owned by payments (synthetic).
+  annotations:
+    retirement-demo.example.com/managed: 'true'
+    retirement-demo.example.com/environment: development
+spec:
+  type: service
+  lifecycle: deprecated
+  owner: group:default/payments-team

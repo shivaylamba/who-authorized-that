@@ -1,0 +1,39 @@
+# Local dependencies. Every port is published on 127.0.0.1 only.
+name: who-authorized-that
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_USER: backstage
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U backstage']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  dex:
+    image: ghcr.io/dexidp/dex:v2.44.0
+    command: ['dex', 'serve', '/etc/dex/config.yaml']
+    environment:
+      DEX_BACKSTAGE_CLIENT_SECRET: ${DEX_BACKSTAGE_CLIENT_SECRET:?set in .env}
+      DEMO_ALICE_PASSWORD_HASH: ${DEMO_ALICE_PASSWORD_HASH:?set in .env}
+      DEMO_BOB_PASSWORD_HASH: ${DEMO_BOB_PASSWORD_HASH:?set in .env}
+      DEMO_CAROL_PASSWORD_HASH: ${DEMO_CAROL_PASSWORD_HASH:?set in .env}
+      DEMO_MIG42_AGENT_PASSWORD_HASH: ${DEMO_MIG42_AGENT_PASSWORD_HASH:?set in .env}
+    ports:
+      - '127.0.0.1:5556:5556'
+    volumes:
+      - ./infra/dex/config.yaml:/etc/dex/config.yaml:ro
+      - dexdata:/var/dex
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  dexdata:

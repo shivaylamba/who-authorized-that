@@ -1,0 +1,15 @@
+# Disposable target. Owned by Alice's team but experimental and not approved:
+# ownership alone must not be enough to retire it.
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: checkout-v2
+  title: checkout-v2
+  description: New checkout flow (synthetic catalog record).
+  annotations:
+    retirement-demo.example.com/managed: 'true'
+    retirement-demo.example.com/environment: development
+spec:
+  type: service
+  lifecycle: experimental
+  owner: group:default/checkout-team

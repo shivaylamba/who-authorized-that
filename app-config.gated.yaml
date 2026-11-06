@@ -1,0 +1,4 @@
+# Safe/default profile. Same caller, task, issue, schemas, fixtures and
+# executor as the ungated lab; affected-resource authorization is enforced.
+retirementDemo:
+  mode: gated

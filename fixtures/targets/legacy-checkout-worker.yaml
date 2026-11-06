@@ -1,0 +1,16 @@
+# Disposable target for act 3. Alice is genuinely authorized to retire it
+# (owned by her team, development, deprecated, approved), but the MIG-42 task
+# grant for the agent does not include it.
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: legacy-checkout-worker
+  title: legacy-checkout-worker
+  description: Old checkout background worker, replaced by checkout-v2 jobs (synthetic).
+  annotations:
+    retirement-demo.example.com/managed: 'true'
+    retirement-demo.example.com/environment: development
+spec:
+  type: service
+  lifecycle: deprecated
+  owner: group:default/checkout-team

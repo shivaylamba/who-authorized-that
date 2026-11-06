@@ -1,0 +1,15 @@
+# Disposable target. Registered dynamically by `yarn demo:seed`.
+# Synthetic stand-in for an active production service owned by another team.
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: payments-api
+  title: payments-api
+  description: Active payments API (synthetic catalog record; no real workload).
+  annotations:
+    retirement-demo.example.com/managed: 'true'
+    retirement-demo.example.com/environment: production
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/payments-team

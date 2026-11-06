@@ -1,0 +1,102 @@
+# Persistent synthetic organization. Registered through a permanent
+# catalog.locations entry, never through the resettable target manifest.
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: alice
+  annotations:
+    retirement-demo.example.com/managed: 'true'
+spec:
+  profile:
+    displayName: Alice (checkout-team)
+    email: alice@demo.example.com
+  memberOf: [checkout-team]
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: bob
+  annotations:
+    retirement-demo.example.com/managed: 'true'
+spec:
+  profile:
+    displayName: Bob (visitor, no retirement gate)
+    email: bob@demo.example.com
+  memberOf: [visitors]
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: carol
+  annotations:
+    retirement-demo.example.com/managed: 'true'
+spec:
+  profile:
+    displayName: Carol (payments-team)
+    email: carol@demo.example.com
+  memberOf: [payments-team]
+---
+# Demo service account for the MIG-42 migration agent. It authenticates with
+# its own Dex login (never Alice's) through Backstage's native OAuth flow.
+# It owns nothing and can only act inside a task grant that a human issues.
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: mig42-agent
+  annotations:
+    retirement-demo.example.com/managed: 'true'
+    retirement-demo.example.com/account-type: agent
+spec:
+  profile:
+    displayName: MIG-42 migration agent (demo service account)
+    email: mig42-agent@demo.example.com
+  memberOf: [agents]
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: agents
+  annotations:
+    retirement-demo.example.com/managed: 'true'
+spec:
+  type: team
+  profile:
+    displayName: Agents (demo service accounts)
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: checkout-team
+  annotations:
+    retirement-demo.example.com/managed: 'true'
+spec:
+  type: team
+  profile:
+    displayName: Checkout Team
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: payments-team
+  annotations:
+    retirement-demo.example.com/managed: 'true'
+spec:
+  type: team
+  profile:
+    displayName: Payments Team
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: visitors
+  annotations:
+    retirement-demo.example.com/managed: 'true'
+spec:
+  type: team
+  profile:
+    displayName: Visitors
+  children: []

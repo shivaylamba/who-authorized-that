@@ -1,0 +1,52 @@
+# Explicit manifest of everything the demo may register, unregister or reset.
+# The backend rejects any target, path or URL that is not listed here, in every
+# profile, including the intentionally unsafe lab.
+version: 1
+
+# Disposable target locations. Each is registered as its own catalog location
+# by `yarn demo:seed` / `yarn demo:reset`, so unregistering one never removes
+# another. Paths are relative to this file.
+targets:
+  - id: checkout-preview
+    file: targets/checkout-preview.yaml
+    entityRefs:
+      - component:default/checkout-preview
+  - id: payments-api
+    file: targets/payments-api.yaml
+    entityRefs:
+      - component:default/payments-api
+  - id: checkout-v2
+    file: targets/checkout-v2.yaml
+    entityRefs:
+      - component:default/checkout-v2
+  - id: legacy-checkout-worker
+    file: targets/legacy-checkout-worker.yaml
+    entityRefs:
+      - component:default/legacy-checkout-worker
+  - id: shared-tooling
+    testOnly: true
+    file: targets/shared-tooling.yaml
+    entityRefs:
+      - component:default/checkout-lint-bot
+      - component:default/payments-ledger-sandbox
+
+# Backend-authoritative retirement approvals. Seeded into the plugin database
+# by the operator; never derived from issue text or tool input.
+approvals:
+  - entityRef: component:default/checkout-preview
+    approvalId: CHG-1042
+    approvedBy: group:default/checkout-team
+  - entityRef: component:default/legacy-checkout-worker
+    approvalId: CHG-1101
+    approvedBy: group:default/checkout-team
+  - entityRef: component:default/checkout-lint-bot
+    approvalId: CHG-1077
+    approvedBy: group:default/checkout-team
+  - entityRef: component:default/payments-ledger-sandbox
+    approvalId: CHG-1078
+    approvedBy: group:default/payments-team
+
+# Read-only issue fixtures exposed by retirement-demo:read-issue.
+issues:
+  - issueId: MIG-42
+    file: issues/MIG-42.md

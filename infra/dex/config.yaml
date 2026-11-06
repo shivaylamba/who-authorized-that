@@ -1,0 +1,45 @@
+# Local OIDC identity provider with synthetic users only.
+# Password hashes and the client secret are injected from .env.
+issuer: http://localhost:5556/dex
+
+storage:
+  type: sqlite3
+  config:
+    file: /var/dex/dex.db
+
+web:
+  http: 0.0.0.0:5556
+
+oauth2:
+  skipApprovalScreen: true
+
+expiry:
+  idTokens: 1h
+
+staticClients:
+  - id: backstage
+    name: Backstage (who-authorized-that)
+    secretEnv: DEX_BACKSTAGE_CLIENT_SECRET
+    redirectURIs:
+      - http://localhost:7007/api/auth/oidc/handler/frame
+
+enablePasswordDB: true
+
+staticPasswords:
+  - email: alice@demo.example.com
+    username: alice
+    userID: 3c0b7b1e-0000-4000-8000-00000000a11c
+    hashFromEnv: DEMO_ALICE_PASSWORD_HASH
+  - email: bob@demo.example.com
+    username: bob
+    userID: 3c0b7b1e-0000-4000-8000-000000000b0b
+    hashFromEnv: DEMO_BOB_PASSWORD_HASH
+  - email: carol@demo.example.com
+    username: carol
+    userID: 3c0b7b1e-0000-4000-8000-0000000ca201
+    hashFromEnv: DEMO_CAROL_PASSWORD_HASH
+  # Demo service account for the MIG-42 agent (not a human).
+  - email: mig42-agent@demo.example.com
+    username: mig42-agent
+    userID: 3c0b7b1e-0000-4000-8000-0000000a6e42
+    hashFromEnv: DEMO_MIG42_AGENT_PASSWORD_HASH

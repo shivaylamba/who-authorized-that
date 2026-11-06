@@ -1,0 +1,14 @@
+# Disposable target. Registered dynamically by `yarn demo:seed`.
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: checkout-preview
+  title: checkout-preview
+  description: Preview deployment of the old checkout flow, superseded by checkout-v2.
+  annotations:
+    retirement-demo.example.com/managed: 'true'
+    retirement-demo.example.com/environment: development
+spec:
+  type: service
+  lifecycle: deprecated
+  owner: group:default/checkout-team

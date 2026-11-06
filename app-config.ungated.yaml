@@ -1,0 +1,5 @@
+# INTENTIONALLY UNSAFE LAB PROFILE. Requires DEMO_LAB_ENABLED=true in the
+# environment as well, or the backend refuses to start. Only for the isolated
+# conference lab and its disposable catalog records.
+retirementDemo:
+  mode: ungated-lab

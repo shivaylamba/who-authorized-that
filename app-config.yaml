@@ -1,0 +1,134 @@
+# Base configuration shared by both startup profiles.
+# Profile overlays: app-config.gated.yaml, app-config.ungated.yaml.
+# Secrets come from .env (see .env.example); never commit real values.
+
+app:
+  title: Who Authorized That?
+  # The built frontend is served by the backend on the same origin.
+  baseUrl: http://localhost:7007
+  packages: all
+  extensions:
+    - page:catalog:
+        config:
+          path: /catalog
+
+organization:
+  name: BackstageCon Identity Lab
+
+backend:
+  baseUrl: http://localhost:7007
+  listen:
+    port: 7007
+    # Loopback only. Reach it through an SSH tunnel; never publish it.
+    host: 127.0.0.1
+  csp:
+    connect-src: ["'self'", 'http:', 'https:']
+  cors:
+    origin: http://localhost:7007
+    methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+    credentials: true
+  database:
+    client: pg
+    connection:
+      host: 127.0.0.1
+      port: 5432
+      user: backstage
+      password: ${POSTGRES_PASSWORD}
+  auth:
+    # The demo operator CLI (seed/reset/run bookkeeping/export) authenticates
+    # with this static token. It is restricted to the retirement-demo plugin,
+    # so it cannot call the catalog or the MCP endpoint.
+    externalAccess:
+      - type: static
+        options:
+          token: ${DEMO_OPERATOR_TOKEN}
+          subject: demo-operator
+        accessRestrictions:
+          - plugin: retirement-demo
+      # The retirement plugin's privileged executor. Backstage itself limits this
+      # principal to the catalog plugin and to exactly these permissions; every
+      # other catalog permission (entity delete, refresh, ...) is denied for it,
+      # and every other plugin rejects the token.
+      - type: static
+        options:
+          token: ${DEMO_EXECUTOR_TOKEN}
+          subject: demo-retirement-executor
+        accessRestrictions:
+          - plugin: catalog
+            permission:
+              - catalog.entity.read
+              - catalog.location.read
+              - catalog.location.create
+              - catalog.location.delete
+      # Findings probe (scripts/findings.ts): a workload principal allowed only
+      # on the MCP and retirement plugins, with no permission list. Used to
+      # reproduce how 1.56 treats service principals; the retirement action
+      # rejects it as a caller.
+      - type: static
+        options:
+          token: ${DEMO_PROBE_SERVICE_TOKEN}
+          subject: probe-workload
+        accessRestrictions:
+          - plugin: mcp-actions
+          - plugin: retirement-demo
+  actions:
+    # Only the demo's own actions are exposed through MCP. The plugin refuses
+    # to start if this list contains anything else (for example catalog,
+    # whose native unregister-entity action would be an alternate route).
+    pluginSources:
+      - retirement-demo
+
+auth:
+  environment: development
+  session:
+    secret: ${AUTH_SESSION_SECRET}
+  providers:
+    oidc:
+      development:
+        metadataUrl: http://localhost:5556/dex/.well-known/openid-configuration
+        clientId: backstage
+        clientSecret: ${DEX_BACKSTAGE_CLIENT_SECRET}
+        prompt: login
+        signIn:
+          resolvers:
+            - resolver: emailMatchingUserEntityProfileEmail
+  # Native Backstage OAuth for MCP / CLI clients (Client ID Metadata Documents).
+  clientIdMetadataDocuments:
+    enabled: true
+    allowedClientIdPatterns:
+      - 'https://claude.ai/*'
+    allowedRedirectUriPatterns:
+      - 'http://localhost:*/*'
+      - 'http://127.0.0.1:*/*'
+  experimentalRefreshToken:
+    enabled: true
+
+catalog:
+  rules:
+    - allow: [Component, System, API, Resource, Location]
+  # Only the persistent synthetic organization is a permanent location.
+  # Disposable targets are registered through the catalog API by demo:seed.
+  locations:
+    - type: file
+      target: ../../fixtures/org/org.yaml
+      rules:
+        - allow: [User, Group]
+
+permission:
+  enabled: true
+
+mcpActions:
+  name: who-authorized-that
+  description: Retirement demo tools for the Who Authorized That? identity lab
+  namespacedToolNames: true
+  servers:
+    retirement:
+      name: who-authorized-that-retirement
+      description: Named endpoint exposing only the retirement demo actions
+      filter:
+        include:
+          - id: 'retirement-demo:*'
+
+retirementDemo:
+  fixturesDir: ../../fixtures
+  executorToken: ${DEMO_EXECUTOR_TOKEN}
