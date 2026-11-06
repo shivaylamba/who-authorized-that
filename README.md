@@ -70,7 +70,8 @@ Details: [`docs/setup.md`](docs/setup.md). Presenting on stage:
 
 ## Docs
 
-**Architecture and code walkthrough:** [`website/index.html`](website/index.html), a static page with
+**Architecture and code walkthrough:** <https://who-authorized-that.vercel.app> (source:
+[`website/index.html`](website/index.html)), a static page with
 the system diagram, the request path, and the code and schema behind each chapter (the
 permission boundary, the resource type, the policy's conditional decision and the task grant).
 Open it locally in a browser, or deploy it to Vercel:

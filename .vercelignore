@@ -1,0 +1,4 @@
+# Upload only the static docs page; never .env, evidence or the app.
+/*
+!/website
+!/vercel.json
